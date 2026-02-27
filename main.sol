@@ -742,3 +742,96 @@ contract Otc {
     function orderFilledAmount(bytes32 orderId) external view returns (uint256) { Order storage o = _orders[orderId]; if (o.maker == address(0)) revert OTC_OrderNotFound(); return o.filledAmount; }
     function orderPricePerUnit(bytes32 orderId) external view returns (uint256) { Order storage o = _orders[orderId]; if (o.maker == address(0)) revert OTC_OrderNotFound(); return o.pricePerUnit; }
     function orderAssetType(bytes32 orderId) external view returns (uint8) { Order storage o = _orders[orderId]; if (o.maker == address(0)) revert OTC_OrderNotFound(); return o.assetType; }
+    function orderAssetId(bytes32 orderId) external view returns (bytes32) { Order storage o = _orders[orderId]; if (o.maker == address(0)) revert OTC_OrderNotFound(); return o.assetId; }
+    function orderIsSell(bytes32 orderId) external view returns (bool) { Order storage o = _orders[orderId]; if (o.maker == address(0)) revert OTC_OrderNotFound(); return o.isSell; }
+    function orderStatus(bytes32 orderId) external view returns (uint8) { Order storage o = _orders[orderId]; if (o.maker == address(0)) revert OTC_OrderNotFound(); return o.status; }
+    function orderMaker(bytes32 orderId) external view returns (address) { Order storage o = _orders[orderId]; if (o.maker == address(0)) revert OTC_OrderNotFound(); return o.maker; }
+    function totalOrderCount() external view returns (uint256) { return _orderIds.length; }
+    function openOrderCount() external view returns (uint256) { uint256 n = 0; for (uint256 i = 0; i < _orderIds.length; i++) if (_orders[_orderIds[i]].status == STATUS_OPEN) n++; return n; }
+    function paused() external view returns (bool) { return _paused; }
+    function minOrder() external view returns (uint256) { return minOrderWei; }
+    function feeBasisPoints() external view returns (uint256) { return feeBps; }
+    function totalFees() external view returns (uint256) { return totalFeesCollected; }
+    function operatorAddress() external view returns (address) { return operator; }
+    function treasuryAddress() external view returns (address) { return treasury; }
+    function escrowKeeperAddress() external view returns (address) { return escrowKeeper; }
+    function deployBlockNumber() external view returns (uint256) { return deployBlock; }
+    function namespace() external view returns (bytes32) { return OTC_NAMESPACE; }
+    function maxOrders() external view returns (uint256) { return OTC_MAX_ORDERS; }
+    function viewBatchSize() external view returns (uint256) { return OTC_VIEW_BATCH; }
+    function assetTypeCrypto() external pure returns (uint8) { return uint8(OTC_ASSET_CRYPTO); }
+    function assetTypeRwa() external pure returns (uint8) { return uint8(OTC_ASSET_RWA); }
+    function statusOpen() external pure returns (uint8) { return uint8(STATUS_OPEN); }
+    function statusFilled() external pure returns (uint8) { return uint8(STATUS_FILLED); }
+    function statusCancelled() external pure returns (uint8) { return uint8(STATUS_CANCELLED); }
+    function bpsDenominator() external pure returns (uint256) { return OTC_BPS_DENOM; }
+    function version() external pure returns (uint256) { return OTC_VERSION; }
+
+    /// @notice Returns order id at index in the global list
+    function orderIdAt(uint256 index) external view returns (bytes32) {
+        if (index >= _orderIds.length) revert OTC_IndexOutOfRange();
+        return _orderIds[index];
+    }
+
+    /// @notice Returns last order id in the list (most recently posted)
+    function lastOrderId() external view returns (bytes32) {
+        if (_orderIds.length == 0) revert OTC_OrderNotFound();
+        return _orderIds[_orderIds.length - 1];
+    }
+
+    /// @notice Compute value in wei for amount * pricePerUnit (18 decimals)
+    function computeOrderValue(uint256 amount, uint256 pricePerUnit) external pure returns (uint256) {
+        return (amount * pricePerUnit) / 1e18;
+    }
+
+    /// @notice Compute fee in wei for a given value
+    function computeFeeForValue(uint256 valueWei) external view returns (uint256) {
+        return (valueWei * feeBps) / OTC_BPS_DENOM;
+    }
+
+    /// @notice Check if order is fully filled
+    function isOrderFilled(bytes32 orderId) external view returns (bool) {
+        Order storage o = _orders[orderId];
+        if (o.maker == address(0)) return false;
+        return o.filledAmount >= o.amount || o.status == STATUS_FILLED;
+    }
+
+    /// @notice Check if order is cancelled
+    function isOrderCancelled(bytes32 orderId) external view returns (bool) {
+        return _orders[orderId].status == STATUS_CANCELLED;
+    }
+
+    /// @notice Remaining fillable amount
+    function remainingAmount(bytes32 orderId) external view returns (uint256) {
+        Order storage o = _orders[orderId];
+        if (o.maker == address(0)) revert OTC_OrderNotFound();
+        return o.amount - o.filledAmount;
+    }
+
+    /// @notice Value of remaining fill (remainingAmount * pricePerUnit)
+    function remainingValue(bytes32 orderId) external view returns (uint256) {
+        Order storage o = _orders[orderId];
+        if (o.maker == address(0)) revert OTC_OrderNotFound();
+        uint256 rem = o.amount - o.filledAmount;
+        return (rem * o.pricePerUnit) / 1e18;
+    }
+
+    // -------------------------------------------------------------------------
+    // ADDITIONAL VIEW HELPERS (compatibility and dashboards)
+    // -------------------------------------------------------------------------
+
+    function getOrderIds() external view returns (bytes32[] memory) {
+        return _orderIds;
+    }
+
+    function getOrderIdsLength() external view returns (uint256) {
+        return _orderIds.length;
+    }
+
+    function hasOrder(bytes32 orderId) external view returns (bool) {
+        return _orders[orderId].maker != address(0);
+    }
+
+    function getFillValueForAmount(bytes32 orderId, uint256 fillAmount) external view returns (uint256) {
+        Order storage o = _orders[orderId];
+        if (o.maker == address(0)) revert OTC_OrderNotFound();
