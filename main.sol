@@ -556,3 +556,96 @@ contract Otc {
     function getOrderSummariesBatch(uint256 offset, uint256 limit) external view returns (OrderSummary[] memory) {
         uint256 len = _orderIds.length;
         if (offset >= len) return new OrderSummary[](0);
+        uint256 end = offset + limit;
+        if (end > len) end = len;
+        if (limit > OTC_VIEW_BATCH) end = offset + OTC_VIEW_BATCH;
+        if (end > len) end = len;
+        OrderSummary[] memory out = new OrderSummary[](end - offset);
+        for (uint256 i = offset; i < end; i++) {
+            Order storage o = _orders[_orderIds[i]];
+            out[i - offset] = OrderSummary({
+                orderId: o.orderId,
+                maker: o.maker,
+                amount: o.amount,
+                filledAmount: o.filledAmount,
+                pricePerUnit: o.pricePerUnit,
+                isSell: o.isSell,
+                status: o.status
+            });
+        }
+        return out;
+    }
+
+    /// @notice Compute total value (amount * price) with 18 decimals
+    function _computeValue(uint256 amount, uint256 pricePerUnit) internal pure returns (uint256) {
+        return (amount * pricePerUnit) / 1e18;
+    }
+
+    /// @notice Compute fee for a given value in wei
+    function _computeFeeWei(uint256 valueWei) internal view returns (uint256) {
+        return (valueWei * feeBps) / OTC_BPS_DENOM;
+    }
+
+    /// @notice Validate order parameters before posting
+    function _validateOrderParams(uint8 assetType, uint256 amount, uint256 pricePerUnit) internal view {
+        if (assetType != OTC_ASSET_CRYPTO && assetType != OTC_ASSET_RWA) revert OTC_InvalidAssetType();
+        if (amount == 0) revert OTC_ZeroAmount();
+        if (pricePerUnit == 0) revert OTC_ZeroPrice();
+        uint256 totalValue = _computeValue(amount, pricePerUnit);
+        if (totalValue < minOrderWei) revert OTC_BelowMinOrder();
+    }
+
+    mapping(bytes32 => address) private _rwaSettlementTaker;
+    mapping(bytes32 => uint256) private _rwaSettlementFillAmount;
+
+    /// @notice Record taker and fill amount for RWA order (for escrow keeper release)
+    function recordRwaFill(bytes32 orderId, address taker, uint256 fillAmount) external onlyEscrowKeeper {
+        Order storage o = _orders[orderId];
+        if (o.maker == address(0)) revert OTC_OrderNotFound();
+        if (o.assetType != OTC_ASSET_RWA) revert OTC_InvalidAssetType();
+        if (o.status != STATUS_OPEN) revert OTC_OrderNotOpen();
+        if (fillAmount == 0 || fillAmount > o.amount - o.filledAmount) revert OTC_ExceedsOrderAmount();
+        _rwaSettlementTaker[orderId] = taker;
+        _rwaSettlementFillAmount[orderId] = fillAmount;
+        o.filledAmount += fillAmount;
+        if (o.filledAmount >= o.amount) o.status = STATUS_FILLED;
+        emit OrderFilled(orderId, taker, fillAmount, block.number);
+    }
+
+    /// @notice Release RWA settlement: escrow keeper confirms and optionally sends fee to treasury
+    function releaseRwaSettlement(bytes32 orderId, uint256 feeWei) external onlyEscrowKeeper nonReentrant {
+        address taker = _rwaSettlementTaker[orderId];
+        uint256 fillAmount = _rwaSettlementFillAmount[orderId];
+        if (taker == address(0)) revert OTC_SettlementNotReady();
+        Order storage o = _orders[orderId];
+        uint256 valueWei = _computeValue(fillAmount, o.pricePerUnit);
+        if (feeWei > 0 && feeWei <= valueWei) {
+            totalFeesCollected += feeWei;
+            (bool ok,) = treasury.call{value: feeWei}("");
+            if (!ok) revert OTC_TransferFailed();
+            emit TreasuryFee(treasury, feeWei, block.number);
+        }
+        emit SettlementReleased(orderId, o.maker, taker, fillAmount, valueWei, block.number);
+        delete _rwaSettlementTaker[orderId];
+        delete _rwaSettlementFillAmount[orderId];
+    }
+
+    function getRwaSettlementTaker(bytes32 orderId) external view returns (address) {
+        return _rwaSettlementTaker[orderId];
+    }
+
+    function getRwaSettlementFillAmount(bytes32 orderId) external view returns (uint256) {
+        return _rwaSettlementFillAmount[orderId];
+    }
+
+    /// @notice Platform stats for dashboards
+    struct PlatformStats {
+        uint256 totalOrders;
+        uint256 openOrders;
+        uint256 totalFeesCollected;
+        uint256 minOrderWei;
+        uint256 feeBps;
+        bool paused;
+        uint256 deployBlock;
+    }
+
