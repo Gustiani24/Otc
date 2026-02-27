@@ -277,3 +277,96 @@ contract Otc {
     mapping(address => bytes32[]) private _makerOrders;
     uint256 public totalFeesCollected;
 
+    function _registerMakerOrder(address maker, bytes32 orderId) internal {
+        _makerOrders[maker].push(orderId);
+    }
+
+    function getOrderCountByMaker(address maker) external view returns (uint256) {
+        return _makerOrders[maker].length;
+    }
+
+    function getOrderIdByMakerAt(address maker, uint256 index) external view returns (bytes32) {
+        bytes32[] storage ids = _makerOrders[maker];
+        if (index >= ids.length) revert OTC_IndexOutOfRange();
+        return ids[index];
+    }
+
+    function getOrderIdsByMakerBatch(address maker, uint256 offset, uint256 limit) external view returns (bytes32[] memory) {
+        bytes32[] storage ids = _makerOrders[maker];
+        uint256 len = ids.length;
+        if (offset >= len) return new bytes32[](0);
+        uint256 end = offset + limit;
+        if (end > len) end = len;
+        if (limit > OTC_VIEW_BATCH) end = offset + OTC_VIEW_BATCH;
+        if (end > len) end = len;
+        bytes32[] memory out = new bytes32[](end - offset);
+        for (uint256 i = offset; i < end; i++) out[i - offset] = ids[i];
+        return out;
+    }
+
+    struct OrderView {
+        bytes32 orderId;
+        address maker;
+        uint8 assetType;
+        bytes32 assetId;
+        uint256 amount;
+        uint256 pricePerUnit;
+        bool isSell;
+        uint256 filledAmount;
+        uint8 status;
+        uint256 createdAt;
+    }
+
+    function getOrderView(bytes32 orderId) external view returns (OrderView memory) {
+        Order storage o = _orders[orderId];
+        if (o.maker == address(0)) revert OTC_OrderNotFound();
+        return OrderView({
+            orderId: o.orderId,
+            maker: o.maker,
+            assetType: o.assetType,
+            assetId: o.assetId,
+            amount: o.amount,
+            pricePerUnit: o.pricePerUnit,
+            isSell: o.isSell,
+            filledAmount: o.filledAmount,
+            status: o.status,
+            createdAt: o.createdAt
+        });
+    }
+
+    function getOpenOrderCount() external view returns (uint256) {
+        uint256 count = 0;
+        for (uint256 i = 0; i < _orderIds.length; i++) {
+            if (_orders[_orderIds[i]].status == STATUS_OPEN) count++;
+        }
+        return count;
+    }
+
+    function getTotalOrderCount() external view returns (uint256) {
+        return _orderIds.length;
+    }
+
+    function orderExists(bytes32 orderId) external view returns (bool) {
+        return _orders[orderId].maker != address(0);
+    }
+
+    function getRemainingAmount(bytes32 orderId) external view returns (uint256) {
+        Order storage o = _orders[orderId];
+        if (o.maker == address(0)) revert OTC_OrderNotFound();
+        return o.amount - o.filledAmount;
+    }
+
+    function getOrderValue(bytes32 orderId) external view returns (uint256) {
+        Order storage o = _orders[orderId];
+        if (o.maker == address(0)) revert OTC_OrderNotFound();
+        return (o.amount * o.pricePerUnit) / 1e18;
+    }
+
+    function getFillValue(bytes32 orderId, uint256 fillAmount) external view returns (uint256) {
+        Order storage o = _orders[orderId];
+        if (o.maker == address(0)) revert OTC_OrderNotFound();
+        return (fillAmount * o.pricePerUnit) / 1e18;
+    }
+
+    function getDeployBlock() external view returns (uint256) {
+        return deployBlock;
