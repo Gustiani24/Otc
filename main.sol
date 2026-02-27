@@ -1021,3 +1021,96 @@ contract Otc {
         return out;
     }
 
+    function orderValueWei(bytes32 orderId) external view returns (uint256) {
+        Order storage o = _orders[orderId];
+        if (o.maker == address(0)) revert OTC_OrderNotFound();
+        return (o.amount * o.pricePerUnit) / 1e18;
+    }
+
+    function filledValueWei(bytes32 orderId) external view returns (uint256) {
+        Order storage o = _orders[orderId];
+        if (o.maker == address(0)) revert OTC_OrderNotFound();
+        return (o.filledAmount * o.pricePerUnit) / 1e18;
+    }
+
+    function unfilledValueWei(bytes32 orderId) external view returns (uint256) {
+        Order storage o = _orders[orderId];
+        if (o.maker == address(0)) revert OTC_OrderNotFound();
+        uint256 rem = o.amount - o.filledAmount;
+        return (rem * o.pricePerUnit) / 1e18;
+    }
+
+    function isCryptoOrder(bytes32 orderId) external view returns (bool) {
+        return _orders[orderId].assetType == OTC_ASSET_CRYPTO;
+    }
+
+    function isRwaOrder(bytes32 orderId) external view returns (bool) {
+        return _orders[orderId].assetType == OTC_ASSET_RWA;
+    }
+
+    function isSellOrder(bytes32 orderId) external view returns (bool) {
+        return _orders[orderId].isSell;
+    }
+
+    function isBuyOrder(bytes32 orderId) external view returns (bool) {
+        Order storage o = _orders[orderId];
+        if (o.maker == address(0)) return false;
+        return !o.isSell;
+    }
+
+    function orderProgressBps(bytes32 orderId) external view returns (uint256) {
+        Order storage o = _orders[orderId];
+        if (o.maker == address(0) || o.amount == 0) return 0;
+        return (o.filledAmount * OTC_BPS_DENOM) / o.amount;
+    }
+
+    function feeForOrderValue(uint256 orderValueWei_) external view returns (uint256) {
+        return (orderValueWei_ * feeBps) / OTC_BPS_DENOM;
+    }
+
+    function netAfterFee(uint256 valueWei) external view returns (uint256) {
+        uint256 fee = (valueWei * feeBps) / OTC_BPS_DENOM;
+        return valueWei - fee;
+    }
+
+    function minOrderValue() external view returns (uint256) {
+        return minOrderWei;
+    }
+
+    function maxOrdersCap() external pure returns (uint256) {
+        return OTC_MAX_ORDERS;
+    }
+
+    function batchSizeCap() external pure returns (uint256) {
+        return OTC_VIEW_BATCH;
+    }
+
+    function getRoleOperator() external view returns (address) { return operator; }
+    function getRoleTreasury() external view returns (address) { return treasury; }
+    function getRoleEscrowKeeper() external view returns (address) { return escrowKeeper; }
+    function platformPaused() external view returns (bool) { return _paused; }
+    function totalOrders() external view returns (uint256) { return _orderIds.length; }
+    function feesCollected() external view returns (uint256) { return totalFeesCollected; }
+    function minimumOrderWei() external view returns (uint256) { return minOrderWei; }
+    function feeBasisPoints() external view returns (uint256) { return feeBps; }
+    function contractVersion() external pure returns (uint256) { return OTC_VERSION; }
+    function domainNamespace() external pure returns (bytes32) { return OTC_NAMESPACE; }
+
+    /// @notice Alias for getOrderView (API compatibility)
+    function fetchOrder(bytes32 orderId) external view returns (OrderView memory) {
+        return getOrderView(orderId);
+    }
+
+    /// @notice Alias for getPlatformStats (API compatibility)
+    function fetchPlatformStats() external view returns (PlatformStats memory) {
+        return getPlatformStats();
+    }
+
+    /// @notice Alias for getOrderSummary (API compatibility)
+    function fetchOrderSummary(bytes32 orderId) external view returns (OrderSummary memory) {
+        return getOrderSummary(orderId);
+    }
+
+    /// @notice Alias for orderIdsBatch (API compatibility)
+    function fetchOrderIds(uint256 offset, uint256 limit) external view returns (bytes32[] memory) {
+        return orderIdsBatch(offset, limit);
