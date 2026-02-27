@@ -835,3 +835,96 @@ contract Otc {
     function getFillValueForAmount(bytes32 orderId, uint256 fillAmount) external view returns (uint256) {
         Order storage o = _orders[orderId];
         if (o.maker == address(0)) revert OTC_OrderNotFound();
+        return (fillAmount * o.pricePerUnit) / 1e18;
+    }
+
+    function getFeeForFillValue(uint256 fillValueWei) external view returns (uint256) {
+        return (fillValueWei * feeBps) / OTC_BPS_DENOM;
+    }
+
+    function meetsMinOrder(uint256 amount, uint256 pricePerUnit) external view returns (bool) {
+        return (amount * pricePerUnit) / 1e18 >= minOrderWei;
+    }
+
+    function canPostMoreOrders() external view returns (bool) {
+        return orderCount < OTC_MAX_ORDERS && !_paused;
+    }
+
+    function getOrderInfo(bytes32 orderId) external view returns (
+        address maker_,
+        uint8 assetType_,
+        bytes32 assetId_,
+        uint256 amount_,
+        uint256 pricePerUnit_,
+        bool isSell_,
+        uint256 filledAmount_,
+        uint8 status_,
+        uint256 createdAt_
+    ) {
+        Order storage o = _orders[orderId];
+        if (o.maker == address(0)) revert OTC_OrderNotFound();
+        return (o.maker, o.assetType, o.assetId, o.amount, o.pricePerUnit, o.isSell, o.filledAmount, o.status, o.createdAt);
+    }
+
+    function getOpenOrderIdsPaginated(uint256 page, uint256 pageSize) external view returns (bytes32[] memory) {
+        if (pageSize > OTC_VIEW_BATCH) pageSize = OTC_VIEW_BATCH;
+        bytes32[] memory temp = new bytes32[](pageSize);
+        uint256 count = 0;
+        uint256 skipped = 0;
+        for (uint256 i = 0; i < _orderIds.length && count < pageSize; i++) {
+            if (_orders[_orderIds[i]].status != STATUS_OPEN) continue;
+            if (skipped < page * pageSize) { skipped++; continue; }
+            temp[count++] = _orderIds[i];
+        }
+        bytes32[] memory out = new bytes32[](count);
+        for (uint256 j = 0; j < count; j++) out[j] = temp[j];
+        return out;
+    }
+
+    function getOrdersByMakerPaginated(address maker, uint256 offset, uint256 limit) external view returns (bytes32[] memory) {
+        return getOrderIdsByMakerBatch(maker, offset, limit);
+    }
+
+    function getSellOrderIdsBatch(uint256 offset, uint256 limit) external view returns (bytes32[] memory) {
+        bytes32[] memory all = orderIdsBatch(offset, limit);
+        uint256 n = 0;
+        for (uint256 i = 0; i < all.length; i++) {
+            if (_orders[all[i]].isSell) n++;
+        }
+        bytes32[] memory out = new bytes32[](n);
+        uint256 j = 0;
+        for (uint256 i = 0; i < all.length; i++) {
+            if (_orders[all[i]].isSell) out[j++] = all[i];
+        }
+        return out;
+    }
+
+    function getBuyOrderIdsBatch(uint256 offset, uint256 limit) external view returns (bytes32[] memory) {
+        bytes32[] memory all = orderIdsBatch(offset, limit);
+        uint256 n = 0;
+        for (uint256 i = 0; i < all.length; i++) {
+            if (!_orders[all[i]].isSell) n++;
+        }
+        bytes32[] memory out = new bytes32[](n);
+        uint256 j = 0;
+        for (uint256 i = 0; i < all.length; i++) {
+            if (!_orders[all[i]].isSell) out[j++] = all[i];
+        }
+        return out;
+    }
+
+    function getFilledOrderIdsBatch(uint256 offset, uint256 limit) external view returns (bytes32[] memory) {
+        bytes32[] memory all = orderIdsBatch(offset, limit);
+        uint256 n = 0;
+        for (uint256 i = 0; i < all.length; i++) {
+            if (_orders[all[i]].status == STATUS_FILLED) n++;
+        }
+        bytes32[] memory out = new bytes32[](n);
+        uint256 j = 0;
+        for (uint256 i = 0; i < all.length; i++) {
+            if (_orders[all[i]].status == STATUS_FILLED) out[j++] = all[i];
+        }
+        return out;
+    }
+
+    function getCancelledOrderIdsBatch(uint256 offset, uint256 limit) external view returns (bytes32[] memory) {
