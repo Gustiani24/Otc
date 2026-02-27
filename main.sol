@@ -928,3 +928,96 @@ contract Otc {
     }
 
     function getCancelledOrderIdsBatch(uint256 offset, uint256 limit) external view returns (bytes32[] memory) {
+        bytes32[] memory all = orderIdsBatch(offset, limit);
+        uint256 n = 0;
+        for (uint256 i = 0; i < all.length; i++) {
+            if (_orders[all[i]].status == STATUS_CANCELLED) n++;
+        }
+        bytes32[] memory out = new bytes32[](n);
+        uint256 j = 0;
+        for (uint256 i = 0; i < all.length; i++) {
+            if (_orders[all[i]].status == STATUS_CANCELLED) out[j++] = all[i];
+        }
+        return out;
+    }
+
+    /// @notice Single order view by index in global list
+    function getOrderViewByIndex(uint256 index) external view returns (OrderView memory) {
+        if (index >= _orderIds.length) revert OTC_IndexOutOfRange();
+        Order storage o = _orders[_orderIds[index]];
+        return OrderView({
+            orderId: o.orderId,
+            maker: o.maker,
+            assetType: o.assetType,
+            assetId: o.assetId,
+            amount: o.amount,
+            pricePerUnit: o.pricePerUnit,
+            isSell: o.isSell,
+            filledAmount: o.filledAmount,
+            status: o.status,
+            createdAt: o.createdAt
+        });
+    }
+
+    function getOrderViewByIndexRange(uint256 fromIdx, uint256 toIdx) external view returns (OrderView[] memory) {
+        if (fromIdx >= _orderIds.length || fromIdx > toIdx) return new OrderView[](0);
+        if (toIdx >= _orderIds.length) toIdx = _orderIds.length - 1;
+        uint256 len = toIdx - fromIdx + 1;
+        if (len > OTC_VIEW_BATCH) len = OTC_VIEW_BATCH;
+        OrderView[] memory out = new OrderView[](len);
+        for (uint256 i = 0; i < len; i++) {
+            Order storage o = _orders[_orderIds[fromIdx + i]];
+            out[i] = OrderView({
+                orderId: o.orderId,
+                maker: o.maker,
+                assetType: o.assetType,
+                assetId: o.assetId,
+                amount: o.amount,
+                pricePerUnit: o.pricePerUnit,
+                isSell: o.isSell,
+                filledAmount: o.filledAmount,
+                status: o.status,
+                createdAt: o.createdAt
+            });
+        }
+        return out;
+    }
+
+    struct PlatformStatsCompact {
+        uint256 totalOrders;
+        uint256 openOrders;
+        uint256 totalFeesWei;
+        bool paused;
+    }
+
+    function getPlatformStatsCompact() external view returns (PlatformStatsCompact memory) {
+        uint256 openCount = 0;
+        for (uint256 i = 0; i < _orderIds.length; i++) {
+            if (_orders[_orderIds[i]].status == STATUS_OPEN) openCount++;
+        }
+        return PlatformStatsCompact({
+            totalOrders: _orderIds.length,
+            openOrders: openCount,
+            totalFeesWei: totalFeesCollected,
+            paused: _paused
+        });
+    }
+
+    function getOrderSummariesForIds(bytes32[] calldata ids) external view returns (OrderSummary[] memory) {
+        OrderSummary[] memory out = new OrderSummary[](ids.length);
+        for (uint256 i = 0; i < ids.length; i++) {
+            Order storage o = _orders[ids[i]];
+            if (o.maker == address(0)) continue;
+            out[i] = OrderSummary({
+                orderId: o.orderId,
+                maker: o.maker,
+                amount: o.amount,
+                filledAmount: o.filledAmount,
+                pricePerUnit: o.pricePerUnit,
+                isSell: o.isSell,
+                status: o.status
+            });
+        }
+        return out;
+    }
+
