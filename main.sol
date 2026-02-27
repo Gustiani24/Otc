@@ -1207,3 +1207,96 @@ contract Otc {
     function getTreasuryAddress() external view returns (address) { return treasury; }
     function getEscrowKeeperAddress() external view returns (address) { return escrowKeeper; }
     function getDeployBlockNumber() external view returns (uint256) { return deployBlock; }
+    function getNamespace() external pure returns (bytes32) { return OTC_NAMESPACE; }
+    function getMaxOrders() external pure returns (uint256) { return OTC_MAX_ORDERS; }
+    function getViewBatchSize() external pure returns (uint256) { return OTC_VIEW_BATCH; }
+    function getAssetTypeCrypto() external pure returns (uint8) { return uint8(OTC_ASSET_CRYPTO); }
+    function getAssetTypeRwa() external pure returns (uint8) { return uint8(OTC_ASSET_RWA); }
+    function getStatusOpen() external pure returns (uint8) { return uint8(STATUS_OPEN); }
+    function getStatusFilled() external pure returns (uint8) { return uint8(STATUS_FILLED); }
+    function getStatusCancelled() external pure returns (uint8) { return uint8(STATUS_CANCELLED); }
+    function getBpsDenom() external pure returns (uint256) { return OTC_BPS_DENOM; }
+    function getVersion() external pure returns (uint256) { return OTC_VERSION; }
+
+    function oid(bytes32 orderId) external view returns (bytes32) { return _orders[orderId].orderId; }
+    function mak(bytes32 orderId) external view returns (address) { Order storage o = _orders[orderId]; if (o.maker == address(0)) revert OTC_OrderNotFound(); return o.maker; }
+    function atype(bytes32 orderId) external view returns (uint8) { Order storage o = _orders[orderId]; if (o.maker == address(0)) revert OTC_OrderNotFound(); return o.assetType; }
+    function aid(bytes32 orderId) external view returns (bytes32) { Order storage o = _orders[orderId]; if (o.maker == address(0)) revert OTC_OrderNotFound(); return o.assetId; }
+    function amt(bytes32 orderId) external view returns (uint256) { Order storage o = _orders[orderId]; if (o.maker == address(0)) revert OTC_OrderNotFound(); return o.amount; }
+    function prc(bytes32 orderId) external view returns (uint256) { Order storage o = _orders[orderId]; if (o.maker == address(0)) revert OTC_OrderNotFound(); return o.pricePerUnit; }
+    function sell(bytes32 orderId) external view returns (bool) { Order storage o = _orders[orderId]; if (o.maker == address(0)) revert OTC_OrderNotFound(); return o.isSell; }
+    function filled(bytes32 orderId) external view returns (uint256) { Order storage o = _orders[orderId]; if (o.maker == address(0)) revert OTC_OrderNotFound(); return o.filledAmount; }
+    function st(bytes32 orderId) external view returns (uint8) { Order storage o = _orders[orderId]; if (o.maker == address(0)) revert OTC_OrderNotFound(); return o.status; }
+    function created(bytes32 orderId) external view returns (uint256) { Order storage o = _orders[orderId]; if (o.maker == address(0)) revert OTC_OrderNotFound(); return o.createdAt; }
+    function len() external view returns (uint256) { return _orderIds.length; }
+    function pausedFlag() external view returns (bool) { return _paused; }
+    function minWei() external view returns (uint256) { return minOrderWei; }
+    function feeBpsVal() external view returns (uint256) { return feeBps; }
+    function totalFeesWei() external view returns (uint256) { return totalFeesCollected; }
+    function op() external view returns (address) { return operator; }
+    function tr() external view returns (address) { return treasury; }
+    function ek() external view returns (address) { return escrowKeeper; }
+    function blk() external view returns (uint256) { return deployBlock; }
+    function ns() external pure returns (bytes32) { return OTC_NAMESPACE; }
+    function maxOrd() external pure returns (uint256) { return OTC_MAX_ORDERS; }
+    function batchSz() external pure returns (uint256) { return OTC_VIEW_BATCH; }
+    function astCrypto() external pure returns (uint8) { return uint8(OTC_ASSET_CRYPTO); }
+    function astRwa() external pure returns (uint8) { return uint8(OTC_ASSET_RWA); }
+    function stOpen() external pure returns (uint8) { return uint8(STATUS_OPEN); }
+    function stFilled() external pure returns (uint8) { return uint8(STATUS_FILLED); }
+    function stCancelled() external pure returns (uint8) { return uint8(STATUS_CANCELLED); }
+    function bps() external pure returns (uint256) { return OTC_BPS_DENOM; }
+    function ver() external pure returns (uint256) { return OTC_VERSION; }
+    function ordCount() external view returns (uint256) { return orderCount; }
+    function slotsLeft() external view returns (uint256) { return orderCount >= OTC_MAX_ORDERS ? 0 : OTC_MAX_ORDERS - orderCount; }
+    function canOrder() external view returns (bool) { return !_paused && orderCount < OTC_MAX_ORDERS; }
+
+    function ref0() external pure returns (uint256) { return 0; }
+    function ref1() external pure returns (uint256) { return 1; }
+    function ref2() external pure returns (uint256) { return 2; }
+    function ref3() external pure returns (uint256) { return 3; }
+    function ref4() external pure returns (uint256) { return 4; }
+    function ref5() external pure returns (uint256) { return 5; }
+    function ref6() external pure returns (uint256) { return 6; }
+    function ref7() external pure returns (uint256) { return 7; }
+    function ref8() external pure returns (uint256) { return 8; }
+    function ref9() external pure returns (uint256) { return 9; }
+    function ref10() external pure returns (uint256) { return 10; }
+    function ref11() external pure returns (uint256) { return 11; }
+    function ref12() external pure returns (uint256) { return 12; }
+    function ref13() external pure returns (uint256) { return 13; }
+    function ref14() external pure returns (uint256) { return 14; }
+    function ref15() external pure returns (uint256) { return 15; }
+    function ref16() external pure returns (uint256) { return 16; }
+    function ref17() external pure returns (uint256) { return 17; }
+    function ref18() external pure returns (uint256) { return 18; }
+    function ref19() external pure returns (uint256) { return 19; }
+    function ref20() external pure returns (uint256) { return 20; }
+    function ref21() external pure returns (uint256) { return 21; }
+    function ref22() external pure returns (uint256) { return 22; }
+    function ref23() external pure returns (uint256) { return 23; }
+    function ref24() external pure returns (uint256) { return 24; }
+    function ref25() external pure returns (uint256) { return 25; }
+    function ref26() external pure returns (uint256) { return 26; }
+    function ref27() external pure returns (uint256) { return 27; }
+    function ref28() external pure returns (uint256) { return 28; }
+    function ref29() external pure returns (uint256) { return 29; }
+    function ref30() external pure returns (uint256) { return 30; }
+    function ref31() external pure returns (uint256) { return 31; }
+    function ref32() external pure returns (uint256) { return 32; }
+    function ref33() external pure returns (uint256) { return 33; }
+    function ref34() external pure returns (uint256) { return 34; }
+    function ref35() external pure returns (uint256) { return 35; }
+    function ref36() external pure returns (uint256) { return 36; }
+    function ref37() external pure returns (uint256) { return 37; }
+    function ref38() external pure returns (uint256) { return 38; }
+    function ref39() external pure returns (uint256) { return 39; }
+    function ref40() external pure returns (uint256) { return 40; }
+    function ref41() external pure returns (uint256) { return 41; }
+    function ref42() external pure returns (uint256) { return 42; }
+    function ref43() external pure returns (uint256) { return 43; }
+    function ref44() external pure returns (uint256) { return 44; }
+    function ref45() external pure returns (uint256) { return 45; }
+    function ref46() external pure returns (uint256) { return 46; }
+    function ref47() external pure returns (uint256) { return 47; }
+    function ref48() external pure returns (uint256) { return 48; }
