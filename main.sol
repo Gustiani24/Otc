@@ -649,3 +649,96 @@ contract Otc {
         uint256 deployBlock;
     }
 
+    function getPlatformStats() external view returns (PlatformStats memory) {
+        uint256 openCount = 0;
+        for (uint256 i = 0; i < _orderIds.length; i++) {
+            if (_orders[_orderIds[i]].status == STATUS_OPEN) openCount++;
+        }
+        return PlatformStats({
+            totalOrders: _orderIds.length,
+            openOrders: openCount,
+            totalFeesCollected: totalFeesCollected,
+            minOrderWei: minOrderWei,
+            feeBps: feeBps,
+            paused: _paused,
+            deployBlock: deployBlock
+        });
+    }
+
+    function getOperator() external view returns (address) { return operator; }
+    function getTreasury() external view returns (address) { return treasury; }
+    function getEscrowKeeper() external view returns (address) { return escrowKeeper; }
+
+    /// @notice Order ids where assetType is CRYPTO (0)
+    function getCryptoOrderIdsBatch(uint256 offset, uint256 limit) external view returns (bytes32[] memory) {
+        bytes32[] memory all = orderIdsBatch(offset, limit);
+        uint256 n = 0;
+        for (uint256 i = 0; i < all.length; i++) {
+            if (_orders[all[i]].assetType == OTC_ASSET_CRYPTO) n++;
+        }
+        bytes32[] memory out = new bytes32[](n);
+        uint256 j = 0;
+        for (uint256 i = 0; i < all.length; i++) {
+            if (_orders[all[i]].assetType == OTC_ASSET_CRYPTO) out[j++] = all[i];
+        }
+        return out;
+    }
+
+    /// @notice Order ids where assetType is RWA (1)
+    function getRwaOrderIdsBatch(uint256 offset, uint256 limit) external view returns (bytes32[] memory) {
+        bytes32[] memory all = orderIdsBatch(offset, limit);
+        uint256 n = 0;
+        for (uint256 i = 0; i < all.length; i++) {
+            if (_orders[all[i]].assetType == OTC_ASSET_RWA) n++;
+        }
+        bytes32[] memory out = new bytes32[](n);
+        uint256 j = 0;
+        for (uint256 i = 0; i < all.length; i++) {
+            if (_orders[all[i]].assetType == OTC_ASSET_RWA) out[j++] = all[i];
+        }
+        return out;
+    }
+
+    /// @notice Whether a fill of fillAmount would succeed for orderId (view only)
+    function wouldFillSucceed(bytes32 orderId, uint256 fillAmount) external view returns (bool) {
+        Order storage o = _orders[orderId];
+        if (o.maker == address(0) || o.status != STATUS_OPEN) return false;
+        if (fillAmount == 0 || fillAmount > o.amount - o.filledAmount) return false;
+        return true;
+    }
+
+    /// @notice Whether posting an order with given params would pass checks (view only)
+    function wouldPostSucceed(uint8 assetType, uint256 amount, uint256 pricePerUnit) external view returns (bool) {
+        if (assetType != OTC_ASSET_CRYPTO && assetType != OTC_ASSET_RWA) return false;
+        if (amount == 0 || pricePerUnit == 0) return false;
+        if ((amount * pricePerUnit) / 1e18 < minOrderWei) return false;
+        if (orderCount >= OTC_MAX_ORDERS) return false;
+        return true;
+    }
+
+    /// @notice Cancel multiple orders by id (operator or maker only)
+    function cancelOrders(bytes32[] calldata orderIds) external nonReentrant {
+        for (uint256 i = 0; i < orderIds.length; i++) {
+            Order storage o = _orders[orderIds[i]];
+            if (o.maker == address(0) || o.status != STATUS_OPEN) continue;
+            if (msg.sender != o.maker && msg.sender != operator) continue;
+            o.status = STATUS_CANCELLED;
+            if (o.isSell && o.assetType == OTC_ASSET_CRYPTO) {
+                uint256 refund = o.amount - o.filledAmount;
+                if (refund > 0) {
+                    (bool ok,) = o.maker.call{value: refund}("");
+                    if (!ok) revert OTC_TransferFailed();
+                }
+            }
+            emit OrderCancelled(orderIds[i], msg.sender, block.number);
+        }
+    }
+
+    uint256 public constant OTC_VERSION = 1;
+    uint256 public constant OTC_CHAIN_ID_PLACEHOLDER = 1;
+
+    function orderCreatedAt(bytes32 orderId) external view returns (uint256) { Order storage o = _orders[orderId]; if (o.maker == address(0)) revert OTC_OrderNotFound(); return o.createdAt; }
+    function orderAmount(bytes32 orderId) external view returns (uint256) { Order storage o = _orders[orderId]; if (o.maker == address(0)) revert OTC_OrderNotFound(); return o.amount; }
+    function orderFilledAmount(bytes32 orderId) external view returns (uint256) { Order storage o = _orders[orderId]; if (o.maker == address(0)) revert OTC_OrderNotFound(); return o.filledAmount; }
+    function orderPricePerUnit(bytes32 orderId) external view returns (uint256) { Order storage o = _orders[orderId]; if (o.maker == address(0)) revert OTC_OrderNotFound(); return o.pricePerUnit; }
+    function orderAssetType(bytes32 orderId) external view returns (uint8) { Order storage o = _orders[orderId]; if (o.maker == address(0)) revert OTC_OrderNotFound(); return o.assetType; }
