@@ -463,3 +463,96 @@ contract Otc {
             });
         }
         return out;
+    }
+
+    mapping(bytes32 => uint256) private _escrowWei;
+
+    function escrowBalance(bytes32 orderId) external view returns (uint256) {
+        return _escrowWei[orderId];
+    }
+
+    function releaseToTreasury(uint256 amountWei) external onlyOperator {
+        if (amountWei == 0) return;
+        (bool ok,) = treasury.call{value: amountWei}("");
+        if (!ok) revert OTC_TransferFailed();
+    }
+
+    /// @notice Returns order ids that are open (status == 0) within the given index range
+    function getOpenOrderIdsInRange(uint256 fromIndex, uint256 toIndex) external view returns (bytes32[] memory) {
+        if (fromIndex >= _orderIds.length || fromIndex > toIndex) return new bytes32[](0);
+        if (toIndex >= _orderIds.length) toIndex = _orderIds.length - 1;
+        uint256 maxLen = toIndex - fromIndex + 1;
+        if (maxLen > OTC_VIEW_BATCH) maxLen = OTC_VIEW_BATCH;
+        bytes32[] memory temp = new bytes32[](maxLen);
+        uint256 count = 0;
+        for (uint256 i = fromIndex; i <= toIndex && count < maxLen; i++) {
+            if (_orders[_orderIds[i]].status == STATUS_OPEN) {
+                temp[count] = _orderIds[i];
+                count++;
+            }
+        }
+        bytes32[] memory out = new bytes32[](count);
+        for (uint256 j = 0; j < count; j++) out[j] = temp[j];
+        return out;
+    }
+
+    /// @notice Returns the number of open orders for a given maker
+    function getMakerOpenCount(address maker) external view returns (uint256) {
+        bytes32[] storage ids = _makerOrders[maker];
+        uint256 n = 0;
+        for (uint256 i = 0; i < ids.length; i++) {
+            if (_orders[ids[i]].status == STATUS_OPEN) n++;
+        }
+        return n;
+    }
+
+    /// @notice Returns order views for an array of order ids
+    function getOrderViewsForIds(bytes32[] calldata orderIds) external view returns (OrderView[] memory) {
+        OrderView[] memory out = new OrderView[](orderIds.length);
+        for (uint256 i = 0; i < orderIds.length; i++) {
+            Order storage o = _orders[orderIds[i]];
+            if (o.maker == address(0)) continue;
+            out[i] = OrderView({
+                orderId: o.orderId,
+                maker: o.maker,
+                assetType: o.assetType,
+                assetId: o.assetId,
+                amount: o.amount,
+                pricePerUnit: o.pricePerUnit,
+                isSell: o.isSell,
+                filledAmount: o.filledAmount,
+                status: o.status,
+                createdAt: o.createdAt
+            });
+        }
+        return out;
+    }
+
+    struct OrderSummary {
+        bytes32 orderId;
+        address maker;
+        uint256 amount;
+        uint256 filledAmount;
+        uint256 pricePerUnit;
+        bool isSell;
+        uint8 status;
+    }
+
+    /// @notice Lightweight order summary for list views
+    function getOrderSummary(bytes32 orderId) external view returns (OrderSummary memory) {
+        Order storage o = _orders[orderId];
+        if (o.maker == address(0)) revert OTC_OrderNotFound();
+        return OrderSummary({
+            orderId: o.orderId,
+            maker: o.maker,
+            amount: o.amount,
+            filledAmount: o.filledAmount,
+            pricePerUnit: o.pricePerUnit,
+            isSell: o.isSell,
+            status: o.status
+        });
+    }
+
+    function getOrderSummariesBatch(uint256 offset, uint256 limit) external view returns (OrderSummary[] memory) {
+        uint256 len = _orderIds.length;
+        if (offset >= len) return new OrderSummary[](0);
