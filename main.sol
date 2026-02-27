@@ -184,3 +184,96 @@ contract Otc {
         });
         _orderIds.push(orderId);
         orderCount++;
+        _registerMakerOrder(msg.sender, orderId);
+        if (isSell && assetType == OTC_ASSET_CRYPTO) {
+            if (msg.value != amount) revert OTC_ZeroAmount();
+        }
+        if (assetType == OTC_ASSET_RWA) emit RwaOrderPosted(orderId, assetId, amount, pricePerUnit);
+        emit OrderPosted(orderId, msg.sender, assetType, assetId, amount, pricePerUnit, isSell, block.number);
+        return orderId;
+    }
+
+    function fillOrder(bytes32 orderId, uint256 fillAmount) external payable whenNotPaused nonReentrant {
+        Order storage o = _orders[orderId];
+        if (o.maker == address(0)) revert OTC_OrderNotFound();
+        if (o.status != STATUS_OPEN) revert OTC_OrderNotOpen();
+        if (fillAmount == 0 || fillAmount > o.amount - o.filledAmount) revert OTC_ExceedsOrderAmount();
+        uint256 takerValue = (fillAmount * o.pricePerUnit) / 1e18;
+        if (o.isSell) {
+            if (msg.value < takerValue) revert OTC_ZeroAmount();
+            (bool ok,) = o.maker.call{value: takerValue}("");
+            if (!ok) revert OTC_TransferFailed();
+            uint256 excess = msg.value - takerValue;
+            if (excess > 0) {
+                (bool ok2,) = msg.sender.call{value: excess}("");
+                if (!ok2) revert OTC_TransferFailed();
+            }
+        } else {
+            if (msg.value < takerValue) revert OTC_ZeroAmount();
+        }
+        o.filledAmount += fillAmount;
+        if (o.filledAmount >= o.amount) o.status = STATUS_FILLED;
+        uint256 fee = (takerValue * feeBps) / OTC_BPS_DENOM;
+        if (fee > 0) {
+            (bool feeOk,) = treasury.call{value: fee}("");
+            if (!feeOk) revert OTC_TransferFailed();
+            totalFeesCollected += fee;
+            emit TreasuryFee(treasury, fee, block.number);
+        }
+        emit OrderFilled(orderId, msg.sender, fillAmount, block.number);
+    }
+
+    function cancelOrder(bytes32 orderId) external nonReentrant {
+        Order storage o = _orders[orderId];
+        if (o.maker == address(0)) revert OTC_OrderNotFound();
+        if (o.status != STATUS_OPEN) revert OTC_OrderNotOpen();
+        if (msg.sender != o.maker && msg.sender != operator) revert OTC_NotOperator();
+        o.status = STATUS_CANCELLED;
+        if (o.isSell && o.assetType == OTC_ASSET_CRYPTO && o.filledAmount < o.amount) {
+            uint256 refund = o.amount - o.filledAmount;
+            (bool ok,) = o.maker.call{value: refund}("");
+            if (!ok) revert OTC_TransferFailed();
+        }
+        emit OrderCancelled(orderId, msg.sender, block.number);
+    }
+
+    function getOrder(bytes32 orderId) external view returns (
+        address maker,
+        uint8 assetType,
+        bytes32 assetId,
+        uint256 amount,
+        uint256 pricePerUnit,
+        bool isSell,
+        uint256 filledAmount,
+        uint8 status,
+        uint256 createdAt
+    ) {
+        Order storage o = _orders[orderId];
+        if (o.maker == address(0)) revert OTC_OrderNotFound();
+        return (o.maker, o.assetType, o.assetId, o.amount, o.pricePerUnit, o.isSell, o.filledAmount, o.status, o.createdAt);
+    }
+
+    function getOrderAt(uint256 index) external view returns (bytes32) {
+        if (index >= _orderIds.length) revert OTC_OrderNotFound();
+        return _orderIds[index];
+    }
+
+    function orderIdsBatch(uint256 offset, uint256 limit) external view returns (bytes32[] memory) {
+        uint256 len = _orderIds.length;
+        if (offset >= len) return new bytes32[](0);
+        uint256 end = offset + limit;
+        if (end > len) end = len;
+        if (limit > OTC_VIEW_BATCH) end = offset + OTC_VIEW_BATCH;
+        if (end > len) end = len;
+        bytes32[] memory out = new bytes32[](end - offset);
+        for (uint256 i = offset; i < end; i++) out[i - offset] = _orderIds[i];
+        return out;
+    }
+
+    function isPaused() external view returns (bool) {
+        return _paused;
+    }
+
+    mapping(address => bytes32[]) private _makerOrders;
+    uint256 public totalFeesCollected;
+
