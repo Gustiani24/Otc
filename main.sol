@@ -1672,3 +1672,88 @@ contract Otc {
     function ref418() external pure returns (uint256) { return 418; }
     function ref419() external pure returns (uint256) { return 419; }
     function ref420() external pure returns (uint256) { return 420; }
+    function ref421() external pure returns (uint256) { return 421; }
+    function ref422() external pure returns (uint256) { return 422; }
+    function ref423() external pure returns (uint256) { return 423; }
+    function ref424() external pure returns (uint256) { return 424; }
+    function ref425() external pure returns (uint256) { return 425; }
+    function ref426() external pure returns (uint256) { return 426; }
+    function ref427() external pure returns (uint256) { return 427; }
+    function ref428() external pure returns (uint256) { return 428; }
+    function ref429() external pure returns (uint256) { return 429; }
+    function ref430() external pure returns (uint256) { return 430; }
+    function ref431() external pure returns (uint256) { return 431; }
+    function ref432() external pure returns (uint256) { return 432; }
+    function ref433() external pure returns (uint256) { return 433; }
+    function ref434() external pure returns (uint256) { return 434; }
+    function ref435() external pure returns (uint256) { return 435; }
+    function ref436() external pure returns (uint256) { return 436; }
+    function ref437() external pure returns (uint256) { return 437; }
+    function ref438() external pure returns (uint256) { return 438; }
+    function ref439() external pure returns (uint256) { return 439; }
+    function ref440() external pure returns (uint256) { return 440; }
+    function ref441() external pure returns (uint256) { return 441; }
+    function ref442() external pure returns (uint256) { return 442; }
+    function ref443() external pure returns (uint256) { return 443; }
+    function ref444() external pure returns (uint256) { return 444; }
+    function ref445() external pure returns (uint256) { return 445; }
+    function ref446() external pure returns (uint256) { return 446; }
+    function ref447() external pure returns (uint256) { return 447; }
+    function ref448() external pure returns (uint256) { return 448; }
+    function ref449() external pure returns (uint256) { return 449; }
+    function ref450() external pure returns (uint256) { return 450; }
+    function ref451() external pure returns (uint256) { return 451; }
+    function ref452() external pure returns (uint256) { return 452; }
+    function ref453() external pure returns (uint256) { return 453; }
+    function ref454() external pure returns (uint256) { return 454; }
+    function ref455() external pure returns (uint256) { return 455; }
+    function ref456() external pure returns (uint256) { return 456; }
+    function ref457() external pure returns (uint256) { return 457; }
+    function ref458() external pure returns (uint256) { return 458; }
+    function ref459() external pure returns (uint256) { return 459; }
+    function ref460() external pure returns (uint256) { return 460; }
+    function ref461() external pure returns (uint256) { return 461; }
+    function ref462() external pure returns (uint256) { return 462; }
+    function ref463() external pure returns (uint256) { return 463; }
+    function ref464() external pure returns (uint256) { return 464; }
+    function ref465() external pure returns (uint256) { return 465; }
+    function ref466() external pure returns (uint256) { return 466; }
+    function ref467() external pure returns (uint256) { return 467; }
+    function ref468() external pure returns (uint256) { return 468; }
+    function ref469() external pure returns (uint256) { return 469; }
+    function ref470() external pure returns (uint256) { return 470; }
+    function ref471() external pure returns (uint256) { return 471; }
+    function ref472() external pure returns (uint256) { return 472; }
+    function ref473() external pure returns (uint256) { return 473; }
+    function ref474() external pure returns (uint256) { return 474; }
+    function ref475() external pure returns (uint256) { return 475; }
+
+    receive() external payable {}
+}
+
+/*
+ * Otc — OTC platform for crypto and RWA.
+ * Mainnet-safe: reentrancy guard, pause, immutable roles.
+ * Order lifecycle: post -> fill -> (optional) settle (RWA).
+ * Fees: feeBps (basis points) on fill value to treasury.
+ * Constants: OTC_MAX_ORDERS 512, OTC_VIEW_BATCH 48, OTC_ASSET_CRYPTO 0, OTC_ASSET_RWA 1.
+ * Immutable: operator, treasury, escrowKeeper, deployBlock.
+ * Events: OrderPosted, OrderFilled, OrderCancelled, SettlementReleased, TreasuryFee, PlatformPaused, PlatformResumed, MinOrderUpdated, FeeBpsUpdated, RwaOrderPosted.
+ * Errors: OTC_ZeroAddress, OTC_NotOperator, OTC_NotEscrowKeeper, OTC_OrderNotFound, OTC_OrderNotOpen, OTC_OrderAlreadyFilled, OTC_OrderAlreadyCancelled, OTC_InvalidAssetType, OTC_ZeroAmount, OTC_ZeroPrice, OTC_BelowMinOrder, OTC_ExceedsOrderAmount, OTC_TransferFailed, OTC_Paused, OTC_InvalidOrderId, OTC_SettlementNotReady, OTC_Reentrant, OTC_FeeBpsTooHigh, OTC_OrderLimitReached, OTC_IndexOutOfRange.
+ *
+ * ABI summary: postOrder(assetType, assetId, amount, pricePerUnit, isSell) payable -> orderId; fillOrder(orderId, fillAmount) payable; cancelOrder(orderId); getOrder(orderId); orderIdsBatch(offset, limit); getOrderView(orderId); getPlatformStats(); getOrderSummary(orderId); getOrderViewsBatch(offset, limit); getOpenOrderIds(maxReturn); cancelOrders(orderIds[]); recordRwaFill(orderId, taker, fillAmount) onlyEscrowKeeper; releaseRwaSettlement(orderId, feeWei) onlyEscrowKeeper; pause/unpause/setMinOrderWei/setFeeBps onlyOperator.
+ * Addresses (immutable): operator 0x1a2b3c4d5e6f7890a1b2c3d4e5f67890a1b2c3d4e5, treasury 0x2b3c4d5e6f7890a1b2c3d4e5f67890a1b2c3d4e5f6, escrowKeeper 0x3c4d5e6f7890a1b2c3d4e5f67890a1b2c3d4e5f678.
+ * Namespace: 0x4d5e6f7890a1b2c3d4e5f67890a1b2c3d4e5f67890a1b2c3d4e5f67890a1b2c3d4e
+ *
+ * --- OTC Platform Reference ---
+ * Post: postOrder(assetType, assetId, amount, pricePerUnit, isSell) payable. For crypto sell, send amount wei.
+ * Fill: fillOrder(orderId, fillAmount) payable. For buy, send fillAmount*pricePerUnit/1e18 wei. Fee sent to treasury.
+ * Cancel: cancelOrder(orderId). Maker or operator. Crypto sell: unfilled wei returned to maker.
+ * RWA: recordRwaFill(orderId, taker, fillAmount) by escrowKeeper; then releaseRwaSettlement(orderId, feeWei).
+ * Views: getOrder, getOrderView, getOrderSummary, getOrderViewByIndex, getOrderViewsBatch, getOrderSummariesBatch.
+ * Batch: orderIdsBatch, getOpenOrderIds, getCryptoOrderIdsBatch, getRwaOrderIdsBatch, getSellOrderIdsBatch, getBuyOrderIdsBatch.
+ * Stats: getPlatformStats, getPlatformStatsCompact, getOpenOrderCount, totalOrderCount.
+ * Roles: getOperator, getTreasury, getEscrowKeeper (immutable). Pause: pause/unpause onlyOperator. Config: setMinOrderWei, setFeeBps onlyOperator.
+ * Safe: nonReentrant on postOrder, fillOrder, cancelOrder, cancelOrders, releaseRwaSettlement. whenNotPaused on post, fill.
+ */
+
